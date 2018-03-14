@@ -46,10 +46,7 @@ public class main extends JavaPlugin implements Listener {
         port = 3306;
         database = "brawl";
         username = "root";
-        password = "haxor";  
-        database2 = "friends";
-        username2 = "root";
-        password2 = "haxor";  
+        password = "haxor";   
         try {     
             openConnection();
             Statement statement = connection.createStatement();          
@@ -58,6 +55,7 @@ public class main extends JavaPlugin implements Listener {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        //update tags etc in tab cuz its cool to do from this plugin
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -78,6 +76,7 @@ public class main extends JavaPlugin implements Listener {
 	@EventHandler
 	public void playerJoinEvent (PlayerLoginEvent e){
 		final Player player = e.getPlayer();
+		//new api thing and then check if banned and if not continue
 		  API thisAPI = new API();
 		  ban thisBan = thisAPI.getBan(player.getUniqueId());
 		  if (!(thisBan.endTime == 0)) {
@@ -89,25 +88,25 @@ public class main extends JavaPlugin implements Listener {
 				  }
 			  }
 		  }
+		  
+		  //check the rank and set it as metadata. Add the permission nodes that plugins made by not me need xD english high quality
 		BukkitRunnable r = new BukkitRunnable() {
 			   @Override
 			   public void run() {
 			      try {
 			         openConnection();
-			         Statement statement = connection.createStatement();
-			         ResultSet result = statement.executeQuery("SELECT * FROM rank WHERE UUID = '" + player.getUniqueId().toString() + "';");
+			         Statement getRankQuery = connection.createStatement();
+			         ResultSet result = getRankQuery.executeQuery("SELECT * FROM rank WHERE UUID = '" + player.getUniqueId().toString() + "';");
 			         int rank = -1;
 			         if (result != null) {
 			        	 while(result.next()) {
 			        		 rank = result.getInt("RANK");
 			        	 }
 			         }
+			         //the rank is -1 if the player has neve joined => add the player to the db and cool stuff.
 			         if (rank == -1) {
-    			         Statement statement2 = connection.createStatement();
-    			         statement2.executeUpdate("INSERT INTO rank (UUID, RANK) VALUES ('"+player.getUniqueId().toString()+"', 0);");
-    			         openConnection2();
-    			         Statement statement3 = connection.createStatement();
-    			         statement3.executeUpdate("CREATE TABLE " + player.getUniqueId().toString()+ "();");
+    			         Statement newrank = connection.createStatement();
+    			         newrank.executeUpdate("INSERT INTO rank (UUID, RANK) VALUES ('"+player.getUniqueId().toString()+"', 0);");
     			         Bukkit.broadcastMessage(player.getName() + " has joined the server for the first time, welcome!");
     			         rank = 0;
 			         }	
@@ -162,20 +161,12 @@ public class main extends JavaPlugin implements Listener {
 	        connection = DriverManager.getConnection("jdbc:mysql://" + this.host + ":" + this.port + "/" + this.database, this.username, this.password);
 	    }
     }
-    public void openConnection2() throws SQLException, ClassNotFoundException {
-	    if (connection != null && !connection.isClosed()) {
-	        return;
-	    }
-	 
-	    synchronized (this) {
-	        if (connection != null && !connection.isClosed()) {
-	            return;
-	        }
-	        Class.forName("com.mysql.jdbc.Driver");
-	        connection = DriverManager.getConnection("jdbc:mysql://" + this.host + ":" + this.port + "/" + this.database2, this.username2, this.password2);
-	    }
-    }
+
+    
+    //called api cuz cool name :p
     public class API {
+    	
+    	//get rank using metaData (is set when the player joins)
     	public int getRank(Player player) {
     		if (player.hasMetadata("RANK")) {
     			metaData meta = new metaData();
@@ -185,15 +176,15 @@ public class main extends JavaPlugin implements Listener {
     			return 0;
     		}
     	}
-    	
+    	//set a players rank
     	public void setRank(final Player player, final int rank ) {
     		BukkitRunnable r = new BukkitRunnable() {
     			   @Override
     			   public void run() {
     			      try {
     			         openConnection();
-    			         Statement statement = connection.createStatement();
-    			         statement.executeUpdate("UPDATE rank SET RANK="+String.valueOf(rank)+" WHERE UUID='"+player.getUniqueId().toString()+"';");
+    			         Statement setrank = connection.createStatement();
+    			         setrank.executeUpdate("UPDATE rank SET RANK="+String.valueOf(rank)+" WHERE UUID='"+player.getUniqueId().toString()+"';");
     			      } catch(ClassNotFoundException e) {
     			         e.printStackTrace();
     			      } catch(SQLException e) {
@@ -203,13 +194,16 @@ public class main extends JavaPlugin implements Listener {
     			};
     			 
     			r.run();
+    			//kick the player cuz we need to notify him :p
     			player.kickPlayer("[BRAWL] - Your permissions have been updated, please relog");
     	}
+    	
+    	//get information about a ban. Notice that this isnt a separate thread and it should be run from within one when used
     	public ban getBan(UUID playerUUID) {
 	         try {
 				openConnection();
-		         Statement statement = connection.createStatement();
-		         ResultSet result = statement.executeQuery("SELECT * FROM ban WHERE UUID = '" + playerUUID.toString() + "';");
+		         Statement banQuery = connection.createStatement();
+		         ResultSet result = banQuery.executeQuery("SELECT * FROM ban WHERE UUID = '" + playerUUID.toString() + "';");
 		         ban cor = new ban();
 		         cor.banner = "null";
 		         cor.reason = "null";
@@ -242,16 +236,18 @@ public class main extends JavaPlugin implements Listener {
 	         return no;
     	}
     	
+    	//ban someone
     	public void setBan(final Player player, final ban thisBan) {
     		BukkitRunnable r = new BukkitRunnable() {
     			   @Override
     			   public void run() {
     			      try {
     			         openConnection();
-    			         Statement statement = connection.createStatement();
-    			         statement.executeUpdate("DELETE FROM ban WHERE UUID = '"+player.getUniqueId().toString()+"';");
-    			         Statement statement2 = connection.createStatement();
-    			         statement2.executeUpdate("INSERT INTO ban (UUID, BANTIME, UNBANTIME, BANNERUUID, PERM, REASON) VALUES ('"+player.getUniqueId().toString()+"', '" +thisBan.startTime+"', '"+thisBan.endTime+"', '"+thisBan.banner+"', '"+ String.valueOf(thisBan.perm)+"', '"+thisBan.reason+ "');");
+    			         //delete old ban if there is one (this can thus also be used to unban even tho it shouldnt be preferred)
+    			         Statement deleteoldban = connection.createStatement();
+    			         deleteoldban.executeUpdate("DELETE FROM ban WHERE UUID = '"+player.getUniqueId().toString()+"';");
+    			         Statement createnewban = connection.createStatement();
+    			         createnewban.executeUpdate("INSERT INTO ban (UUID, BANTIME, UNBANTIME, BANNERUUID, PERM, REASON) VALUES ('"+player.getUniqueId().toString()+"', '" +thisBan.startTime+"', '"+thisBan.endTime+"', '"+thisBan.banner+"', '"+ String.valueOf(thisBan.perm)+"', '"+thisBan.reason+ "');");
     			      } catch(ClassNotFoundException e) {
     			         e.printStackTrace();
     			      } catch(SQLException e) {
@@ -268,15 +264,16 @@ public class main extends JavaPlugin implements Listener {
 			  }
     	}
     	public void unBan(final UUID playerUUID) {
+    		//unban simply by changing the enddate of the ban.
     		BukkitRunnable r = new BukkitRunnable() {
     			   @Override
     			   public void run() {
     			      try {
     			         openConnection();
-    			         Statement statement = connection.createStatement();
-    			         statement.executeUpdate("UPDATE ban SET UNBANTIME="+String.valueOf(0)+" WHERE UUID='"+playerUUID.toString()+"';");
-    			         Statement statement2 = connection.createStatement();
-    			         statement2.executeUpdate("UPDATE ban SET PERM="+String.valueOf(false)+" WHERE UUID='"+playerUUID.toString()+"';");
+    			         Statement setunbantime = connection.createStatement();
+    			         setunbantime.executeUpdate("UPDATE ban SET UNBANTIME="+String.valueOf(0)+" WHERE UUID='"+playerUUID.toString()+"';");
+    			         Statement setperm = connection.createStatement();
+    			         setperm.executeUpdate("UPDATE ban SET PERM="+String.valueOf(false)+" WHERE UUID='"+playerUUID.toString()+"';");
     			      } catch(ClassNotFoundException e) {
     			         e.printStackTrace();
     			      } catch(SQLException e) {
@@ -291,6 +288,7 @@ public class main extends JavaPlugin implements Listener {
     
     @Override
     public boolean onCommand(final CommandSender sender, Command cmd, String label, final String[] args) {
+    	//a warp command simply because staff needed it while making the map nothing to worry about
     	if (cmd.getName().equalsIgnoreCase("warp")) {
     		Player p = (Player) sender;
     		permissionStuff perm = new permissionStuff();
@@ -300,8 +298,8 @@ public class main extends JavaPlugin implements Listener {
 	    			if (args[0].equals("set")) {
 	  			      try {
 	 			         openConnection();
-	     			     Statement statement = connection.createStatement();
-	     			     statement.executeUpdate("INSERT INTO warps (name, x, y, z) VALUES ('"  + args[1] + "', '" + String.valueOf(p.getLocation().getX()) + "', '" + String.valueOf(p.getLocation().getY()) + "', '"   + String.valueOf(p.getLocation().getZ()) + "');");
+	     			     Statement newwarp = connection.createStatement();
+	     			     newwarp.executeUpdate("INSERT INTO warps (name, x, y, z) VALUES ('"  + args[1] + "', '" + String.valueOf(p.getLocation().getX()) + "', '" + String.valueOf(p.getLocation().getY()) + "', '"   + String.valueOf(p.getLocation().getZ()) + "');");
 	 			      } catch(ClassNotFoundException e) {
 	 			         e.printStackTrace();
 	 			      } catch(SQLException e) {
@@ -312,8 +310,8 @@ public class main extends JavaPlugin implements Listener {
 	    			if (args[0].equals("delete")) {
 		  			      try {
 			 			         openConnection();
-			     			     Statement statement = connection.createStatement();
-			     			     statement.executeUpdate("DELETE FROM warps WHERE name = '" + args[1] + "';");
+			     			     Statement deletewarp = connection.createStatement();
+			     			     deletewarp.executeUpdate("DELETE FROM warps WHERE name = '" + args[1] + "';");
 			 			      } catch(ClassNotFoundException e) {
 			 			         e.printStackTrace();
 			 			      } catch(SQLException e) {
@@ -323,8 +321,8 @@ public class main extends JavaPlugin implements Listener {
 	    			}
 	  			      try {
 		 			         openConnection();
-		     			     Statement statement = connection.createStatement();
-		    		         ResultSet result = statement.executeQuery("SELECT * FROM warps WHERE name = '" + args[0]+ "';");
+		     			     Statement getwarpQuery = connection.createStatement();
+		    		         ResultSet result = getwarpQuery.executeQuery("SELECT * FROM warps WHERE name = '" + args[0]+ "';");
 		    		         if (result != null) {
 		    		        	 while(result.next()) {
 		    		        		 p.teleport(new Location(p.getWorld(), Double.valueOf(result.getString("x")), Double.valueOf(result.getString("y")), Double.valueOf(result.getString("z"))));
@@ -345,6 +343,7 @@ public class main extends JavaPlugin implements Listener {
     		return false;
     	}
     	if (cmd.getName().equalsIgnoreCase("permission")) {
+    		//set the rank of a player 
     		API api = new API();
     		if (sender.isOp()) {
     			if (args[0].equals("get")) {
@@ -371,6 +370,7 @@ public class main extends JavaPlugin implements Listener {
         		metaData meta = new metaData();
         		int rank = (int) meta.getMetadata((Player) sender, "RANK");
     			if (rank>3) {
+    				//if the 
         			for (final Player player : Bukkit.getOnlinePlayers()) {
         				if (player.getName().equals(args[0])) {
             				final API thisAPI = new API();
