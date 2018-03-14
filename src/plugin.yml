@@ -1,0 +1,10 @@
+name: brawlEssentials
+main: brawl.snaxv2.essentials.main
+version: 0.1
+author: snaxv2
+commands:
+    permission:
+    ban:
+    unban:
+    viewban:
+    warp:
